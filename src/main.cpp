@@ -1,55 +1,31 @@
-// Copyright (C) 2024 The Qt Company Ltd.
-// SPDX-License-Identifier: LicenseRef-Qt-Commercial OR GPL-3.0-only
+#include "GoalManager.h"
+#include "MealNamesModel.h"
+#include "NutrientModel.h"
+#include "SearchSettingsManager.h"
+#include "WeightManager.h"
 
+#include <BuildConfig.h>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
-#include <QQmlComponent>
-
-#include "DataManager.h"
-#include "CacheManager.h"
-#include "GoalManager.h"
-#include "PlatformHelper.h"
-#include "NutritionManager.h"
-#include "SettingsManager.h"
-
 #include <QQmlContext>
-#include <BuildConfig.h>
+
+#include <CacheManager.h>
+#include <QIcon>
+#include <QQuickStyle>
 
 int main(int argc, char *argv[])
 {
-#ifdef Q_OS_ANDROID
-    qputenv("QT_SCALE_FACTOR", QByteArray::number(1));
-#endif
-
-    qputenv("QML_COMPAT_RESOLVE_URLS_ON_ASSIGNMENT", "1");
-    qputenv("QT_AUTO_SCREEN_SCALE_FACTOR", "1");
-    qputenv("QT_ENABLE_HIGHDPI_SCALING", "1");
-    qputenv("QT_LOGGING_RULES", "qt.qml.connections=false");
-    qputenv("QT_QUICK_CONTROLS_CONF", ":/qtquickcontrols2.conf");
-
     QGuiApplication app(argc, argv);
-    app.setApplicationDisplayName(BuildConfig.APP_NAME);
+
+    app.setOrganizationName(BuildConfig.ORG_NAME);
     app.setApplicationName(BuildConfig.APP_NAME);
     app.setApplicationVersion(BuildConfig.versionString());
-    app.setOrganizationName(BuildConfig.ORG_NAME);
 
-    PlatformHelper platform;
-    Recipe recipe;
-    GoalManager manager;
-    NutritionManager nutrition;
-    SettingsManager settings;
+    app.setWindowIcon(QIcon(":/OpenFitnessPal"));
 
-    DataManager::init();
-    CacheManager::init();
+    QQuickStyle::setStyle("Universal");
 
     QQmlApplicationEngine engine;
-
-    engine.rootContext()->setContextProperty("settings", &settings);
-    engine.rootContext()->setContextProperty("goalManager", &manager);
-    engine.rootContext()->setContextProperty("nutritionManager", &nutrition);
-    engine.rootContext()->setContextProperty("platform", &platform);
-    engine.rootContext()->setContextProperty("blankRecipe", QVariant::fromValue(recipe));
-
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
@@ -57,7 +33,30 @@ int main(int argc, char *argv[])
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
-    engine.loadFromModule("OpenFitnessPalContent", "App");
+    CacheManager::init();
+
+    MealNamesModel *mealNames = new MealNamesModel(&app);
+    engine.rootContext()->setContextProperty("mealNamesModel", mealNames);
+
+    SearchSettingsManager *searchSettings = new SearchSettingsManager(&app);
+    engine.rootContext()->setContextProperty("searchSettings", searchSettings);
+
+    GoalManager *goals = new GoalManager(&app);
+    engine.rootContext()->setContextProperty("goalManager", goals);
+
+    WeightManager *weight = new WeightManager(&app);
+    engine.rootContext()->setContextProperty("weightManager", weight);
+
+    NutrientModel *micros = new NutrientModel(false, true, &app);
+    engine.rootContext()->setContextProperty("microsModel", micros);
+
+    NutrientModel *macros = new NutrientModel(true, false, &app);
+    engine.rootContext()->setContextProperty("macrosModel", macros);
+
+    NutrientModel *all = new NutrientModel(true, true, &app);
+    engine.rootContext()->setContextProperty("nutrientsModel", all);
+
+    engine.loadFromModule("OpenFitnessPal", "Main");
 
     return app.exec();
 }
